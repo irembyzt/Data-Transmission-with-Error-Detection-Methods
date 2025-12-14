@@ -21,11 +21,13 @@ Project Structure
 
 ```
 project/
-├── checks.py
-├── corruptions.py
-├── sender.py
+├── client1.py
+├── client2.py
 ├── server.py
-├── receiver.py
+├── controls.py
+├── errors.py
+├── utils.py
+├── main.py
 └── README.md
 ```
 
