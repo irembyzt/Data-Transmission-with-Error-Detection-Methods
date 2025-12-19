@@ -1,28 +1,53 @@
 import socket
-import random
-from errors import ERROR_METHODS
+from controls import ERROR_METHODS
 
 HOST = "127.0.0.1"
-PORT_SERVER = 9000
-PORT_CLIENT2 = 9001
+PORT_SERVER = 12000
+PORT_CLIENT2 = 12001
+
+
+# Method -> Error mapping (akademik olarak doğru)
+METHOD_ERROR_MAP = {
+    "PARITY": ("Multiple Bit Flips", ERROR_METHODS["Multiple Bit Flips"]),
+    "2DPARITY": ("Burst Error", ERROR_METHODS["Burst Error"]),
+    "CRC16": ("Burst Error", ERROR_METHODS["Burst Error"]),
+    "HAMMING": ("Bit Flip", ERROR_METHODS["Bit Flip"]),
+    "CHECKSUM": ("Character Substitution", ERROR_METHODS["Character Substitution"]),
+}
+
 
 def server():
     s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((HOST, PORT_SERVER))
-    s.listen(1)
+    s.listen(5)
 
-    conn,_ = s.accept()
-    packet = conn.recv(4096).decode()
-    conn.close()
-    s.close()
+    print("DATACOM SERVER STARTED")
 
-    data, method, control = packet.split("|")
+    while True:
+        conn, addr = s.accept()
+        packet = conn.recv(4096).decode()
+        conn.close()
 
-    error_name, error_func = random.choice(list(ERROR_METHODS.items()))
-    corrupted = data if error_func is None else error_func(data)
+        # DATA | METHOD | CONTROL
+        data, method, control = packet.split("|", 2)
 
-    fwd = socket.socket()
-    fwd.connect((HOST, PORT_CLIENT2))
-    error_flag = "1" if error_name != "NO ERROR" else "0"
-    fwd.send(f"{corrupted}|{method}|{control}|{error_flag}".encode())
-    fwd.close()
+        error_name, error_func = METHOD_ERROR_MAP.get(method, ("NO ERROR", None))
+        corrupted = data if error_func is None else error_func(data)
+        error_flag = "1" if error_func else "0"
+
+        print("----------------------------------")
+        print(f"[SERVER] Method     : {method}")
+        print(f"[SERVER] Error Type : {error_name}")
+        print(f"[SERVER] Original   : {data}")
+        print(f"[SERVER] Corrupted  : {corrupted}")
+        print("----------------------------------")
+
+        fwd = socket.socket()
+        fwd.connect((HOST, PORT_CLIENT2))
+        fwd.send(f"{corrupted}|{method}|{control}|{error_flag}".encode())
+        fwd.close()
+
+
+if __name__ == "__main__":
+    server()
