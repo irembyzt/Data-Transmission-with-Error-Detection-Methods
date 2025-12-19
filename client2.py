@@ -2,14 +2,15 @@ import socket
 from controls import compute_control
 
 HOST = "127.0.0.1"
-PORT_CLIENT2 = 9001
+PORT_CLIENT2 = 12001
 
 def client2():
     s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((HOST, PORT_CLIENT2))
     s.listen(1)
 
-    conn,_ = s.accept()
+    conn, _ = s.accept()
     packet = conn.recv(4096).decode()
     conn.close()
     s.close()
@@ -26,3 +27,6 @@ def client2():
         print("Status : DATA CORRECT")
     else:
         print("Status : DATA CORRUPTED")
+
+if __name__ == "__main__":
+    client2()
