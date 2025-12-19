@@ -1,12 +1,27 @@
-from utils import bytes_to_bitstr, bitstr_to_hex
+import random
 
-METHODS = ["PARITY", "2DPARITY", "CRC16", "HAMMING", "CHECKSUM"]
+# =========================
+# Utility
+# =========================
+def bytes_to_bitstr(b: bytes) -> str:
+    return "".join(f"{byte:08b}" for byte in b)
 
-def parity_control(text: str) -> str:
+def bitstr_to_hex(bitstr: str) -> str:
+    if len(bitstr) % 4 != 0:
+        bitstr += "0" * (4 - len(bitstr) % 4)
+    return "".join(f"{int(bitstr[i:i+4], 2):X}" for i in range(0, len(bitstr), 4))
+
+def safe_text(text: str) -> str:
+    return text.replace("|", "/")
+
+# =========================
+# Control Methods
+# =========================
+def parity_control(text):
     bits = bytes_to_bitstr(text.encode())
     return "0" if bits.count("1") % 2 == 0 else "1"
 
-def parity2d_control(text: str, cols=8) -> str:
+def parity2d_control(text, cols=8):
     bits = bytes_to_bitstr(text.encode())
     rows = (len(bits) + cols - 1) // cols
     bits = bits.ljust(rows * cols, "0")
@@ -20,7 +35,7 @@ def parity2d_control(text: str, cols=8) -> str:
 
     return "".join(row_p) + "," + "".join(col_p)
 
-def crc16(text: str) -> str:
+def crc16(text):
     crc = 0xFFFF
     for b in text.encode():
         crc ^= b << 8
@@ -29,7 +44,7 @@ def crc16(text: str) -> str:
             crc &= 0xFFFF
     return f"{crc:04X}"
 
-def checksum(text: str) -> str:
+def checksum(text):
     data = text.encode()
     if len(data) % 2:
         data += b"\x00"
@@ -39,7 +54,7 @@ def checksum(text: str) -> str:
         s = (s & 0xFFFF) + (s >> 16)
     return f"{(~s) & 0xFFFF:04X}"
 
-def hamming_control(text: str) -> str:
+def hamming_control(text):
     bits = bytes_to_bitstr(text.encode())
     bits = bits.ljust(len(bits) + (-len(bits) % 4), "0")
 
@@ -61,3 +76,49 @@ def compute_control(method, data):
         "HAMMING": hamming_control,
         "CHECKSUM": checksum
     }[method](data)
+
+# =========================
+# Error Injection
+# =========================
+def bit_flip(text):
+    b = bytearray(text.encode())
+    i = random.randrange(len(b))
+    b[i] ^= 1 << random.randrange(8)
+    return b.decode(errors="replace")
+
+def char_sub(text):
+    i = random.randrange(len(text))
+    return text[:i] + chr(random.randint(32,126)) + text[i+1:]
+
+def char_del(text):
+    i = random.randrange(len(text))
+    return text[:i] + text[i+1:]
+
+def char_ins(text):
+    i = random.randrange(len(text)+1)
+    return text[:i] + chr(random.randint(32,126)) + text[i:]
+
+def char_swap(text):
+    i = random.randrange(len(text)-1)
+    return text[:i] + text[i+1] + text[i] + text[i+2:]
+
+def multi_bit(text):
+    for _ in range(3):
+        text = bit_flip(text)
+    return text
+
+def burst(text):
+    n = random.randint(3, min(8, len(text)))
+    i = random.randint(0, len(text)-n)
+    return text[:i] + "".join(chr(random.randint(32,126)) for _ in range(n)) + text[i+n:]
+
+ERROR_METHODS = {
+    "NO ERROR": None,
+    "Bit Flip": bit_flip,
+    "Character Substitution": char_sub,
+    "Character Deletion": char_del,
+    "Random Insertion": char_ins,
+    "Character Swap": char_swap,
+    "Multiple Bit Flips": multi_bit,
+    "Burst Error": burst
+}
